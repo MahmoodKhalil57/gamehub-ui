@@ -3,19 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2ead9">
   <title>GameHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Fraunces:ital,opsz,wght@0,9..144,600..700;1,9..144,600&family=Space+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='5' y='5' width='30' height='30' rx='8' fill='%23ff4a1c' stroke='%2316130f' stroke-width='3' transform='rotate(-10 20 20)'/%3E%3Ccircle cx='14' cy='15' r='3' fill='%2316130f'/%3E%3Ccircle cx='20' cy='20' r='3' fill='%2316130f'/%3E%3Ccircle cx='26' cy='25' r='3' fill='%2316130f'/%3E%3C/svg%3E">
 </head>
 <body>
   <header class="nav">
-    <a class="brand" href="#/">🎲 GameHub</a>
+    <a class="brand" href="#/">
+      <svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="9" width="28" height="28" rx="7" fill="#16130f"/><rect x="4" y="4" width="28" height="28" rx="7" fill="#ff4a1c" stroke="#16130f" stroke-width="2.5"/><circle cx="11.5" cy="11.5" r="2.8" fill="#16130f"/><circle cx="18" cy="18" r="2.8" fill="#16130f"/><circle cx="24.5" cy="24.5" r="2.8" fill="#16130f"/></svg>
+      GameHub
+    </a>
     <nav id="navlinks"></nav>
   </header>
-  <main id="app"><p class="muted pad">Loading…</p></main>
-  <footer class="foot"><span class="muted">GameHub · a tiny engine for party games</span></footer>
+  <main id="app"><div class="loading"><p><span>L</span><span>o</span><span>a</span>ding</p></div></main>
+  <footer class="foot"><span>GameHub · party games for phones</span><span>No app · no account · just a code</span></footer>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
   <script src="play.js"></script>
   <script src="app.js"></script>
 </body>
