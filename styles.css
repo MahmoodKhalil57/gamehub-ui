@@ -42,3 +42,53 @@ label{display:block;margin-top:12px;font-size:13px;color:var(--muted);font-weigh
 .stack{display:flex;flex-direction:column;gap:14px}
 .banner{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:16px}
 code{background:var(--panel2);padding:1px 6px;border-radius:6px}
+
+/* ---------- live rooms ---------- */
+:root{ --teamA:#ff7a55; --teamA-bg:rgba(255,122,85,.12); --teamB:#34cdb8; --teamB-bg:rgba(52,205,184,.12); }
+.room{display:flex;flex-direction:column;gap:14px}
+.roomhead{display:flex;flex-direction:column;gap:10px}
+.label{display:block;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+.timer{font:600 18px ui-monospace,Menlo,monospace;padding:4px 10px;border-radius:10px;background:var(--panel2)}
+.timer.low{background:var(--danger);color:#fff}
+.people{display:flex;flex-wrap:wrap;gap:8px}
+.person{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;border-radius:999px;background:var(--panel2);font-size:13px;font-weight:600}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.sw{width:32px;height:32px;border-radius:50%;padding:0;border:3px solid transparent}
+.sw[aria-pressed=true]{border-color:var(--ink)}
+.case{border-width:2px}
+.law{font-size:21px;font-weight:700;line-height:1.3;margin:10px 0}
+.twist{background:var(--panel2);border-radius:10px;padding:8px 12px;font-weight:600}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.team{border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.team.tA{background:var(--teamA-bg)} .team.tA strong{color:var(--teamA)}
+.team.tB{background:var(--teamB-bg)} .team.tB strong{color:var(--teamB)}
+.brief{background:rgba(255,204,51,.08);border-radius:10px;padding:12px;margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.brief.secret{border:2px dashed var(--gold)}
+.brief p{margin:0}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
+.pickbtn{background:var(--panel2);color:var(--ink);border:1.5px solid var(--line);text-align:left}
+.pickbtn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.gold,button.gold{background:var(--gold);color:#1b1400}
+.bar{display:grid;grid-template-columns:110px 1fr 32px;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+.track{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;display:block}
+.fill{display:block;height:100%;border-radius:6px}
+.fill.tA{background:var(--teamA)} .fill.tB{background:var(--teamB)}
+.board{display:flex;flex-direction:column}
+.board .r{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{max-width:86%;padding:8px 12px;border-radius:14px;background:var(--panel);border:1px solid var(--line);align-self:flex-start;overflow-wrap:anywhere}
+.msg .who{font-size:12px;font-weight:700;color:var(--muted)}
+.msg.me{align-self:flex-end;background:var(--accent);border-color:var(--accent);color:#fff}
+.msg.me .who{color:rgba(255,255,255,.8)}
+.msg.tA:not(.me){border-left:4px solid var(--teamA)}
+.msg.tB:not(.me){border-left:4px solid var(--teamB)}
+.msg.offer{border:2px solid var(--gold)}
+.msg.sys{align-self:center;background:transparent;border:0;color:var(--muted);font-size:13px;text-align:center;max-width:100%}
+.msg.judge{align-self:stretch;max-width:100%;background:rgba(255,204,51,.08);border:1.5px solid var(--gold);white-space:pre-wrap}
+.msg.judge .who{color:var(--gold)}
+.composer{position:sticky;bottom:0;background:var(--bg);padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.composer form{flex-wrap:nowrap}
+.composer input{flex:1;min-width:0;margin:0}
+@media (max-width:420px){ .teams{grid-template-columns:1fr} .bar{grid-template-columns:90px 1fr 28px} }

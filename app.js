@@ -9,6 +9,7 @@
   const db = configured ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
 
   let user = null;
+  const isDev = () => !!user && !user.is_anonymous;
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "game";
   const go = hash => { location.hash = hash; };
@@ -16,7 +17,7 @@
 
   function renderNav() {
     if (!configured) { nav.innerHTML = ""; return; }
-    nav.innerHTML = user
+    nav.innerHTML = isDev()
       ? `<a href="#/">Marketplace</a><a href="#/dev">My games</a><a href="#" id="logout">Log out</a>`
       : `<a href="#/">Marketplace</a><a href="#/login">Developer login</a>`;
     const lo = document.getElementById("logout");
@@ -32,13 +33,13 @@
   }
 
   async function viewMarketplace() {
-    setHTML(`<div class="row between"><h1>Browse games</h1>${user ? `<a class="btn sm" href="#/new">+ New game</a>` : ""}</div>
+    setHTML(`<div class="row between"><h1>Browse games</h1>${isDev() ? `<a class="btn sm" href="#/new">+ New game</a>` : ""}</div>
       <p class="muted">Party games you can share and play. Published by developers on GameHub.</p>
       <div id="list" class="grid" style="margin-top:16px"><p class="muted">Loading games…</p></div>`);
     const { data, error } = await db.from("games").select("slug,title,tagline,plays").eq("status", "published").order("created_at", { ascending: false });
     const list = document.getElementById("list");
     if (error) { list.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
-    if (!data.length) { list.innerHTML = `<div class="card"><p class="muted">No published games yet. ${user ? `<a href="#/new">Create the first one.</a>` : `Log in as a developer to add one.`}</p></div>`; return; }
+    if (!data.length) { list.innerHTML = `<div class="card"><p class="muted">No published games yet. ${isDev() ? `<a href="#/new">Create the first one.</a>` : `Log in as a developer to add one.`}</p></div>`; return; }
     list.innerHTML = data.map(g => `<a class="card gamecard" href="#/game/${esc(g.slug)}">
       <h3>${esc(g.title)}</h3><p class="small muted">${esc(g.tagline || "")}</p>
       <p class="small muted" style="margin-top:8px">▶ ${g.plays} plays</p></a>`).join("");
@@ -62,6 +63,7 @@
       const password = document.getElementById("pw").value;
       if (!email || !password) { msg.innerHTML = `<p class="err">Email and password required.</p>`; return; }
       msg.innerHTML = `<p class="muted">Working…</p>`;
+      if (user?.is_anonymous) await db.auth.signOut();
       const fn = login ? db.auth.signInWithPassword({ email, password }) : db.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
       const { data, error } = await fn;
       if (error) { msg.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
@@ -71,7 +73,7 @@
   }
 
   async function viewDev() {
-    if (!user) return go("#/login");
+    if (!isDev()) return go("#/login");
     setHTML(`<div class="row between"><h1>My games</h1><a class="btn" href="#/new">+ New game</a></div>
       <div id="mine" class="stack" style="margin-top:16px"><p class="muted">Loading…</p></div>`);
     const { data, error } = await db.from("games").select("*").eq("owner", user.id).order("created_at", { ascending: false });
@@ -94,7 +96,7 @@
   }
 
   function viewNew() {
-    if (!user) return go("#/login");
+    if (!isDev()) return go("#/login");
     setHTML(`<div class="form card"><h1>New game</h1><div id="msg"></div>${gameForm()}
       <div class="row" style="margin-top:14px"><button id="save">Create</button><a class="btn ghost" href="#/dev">Cancel</a></div></div>`);
     document.getElementById("save").onclick = async () => {
@@ -109,7 +111,7 @@
   }
 
   async function viewEdit(id) {
-    if (!user) return go("#/login");
+    if (!isDev()) return go("#/login");
     const { data: g, error } = await db.from("games").select("*").eq("id", id).single();
     if (error || !g) { setHTML(`<p class="err">${esc(error?.message || "Game not found.")}</p>`); return; }
     setHTML(`<div class="form card"><div class="row between"><h1>Edit game</h1>
@@ -162,15 +164,26 @@
       </div>
       <div class="card" style="margin-top:14px">
         <h3>Play</h3>
-        <p class="muted small">The live multiplayer runtime (lobby, realtime chat, scoring) plugs in here next —
-        this is the platform skeleton. Each game's runtime will read its settings from the game's <code>config</code>.</p>
-        <button disabled>Create a room (coming next)</button>
+        ${g.config?.engine ? `<p class="muted small">Start a room and share the link. Friends join from their phones with just a name.</p>
+        <div class="row"><button id="mkroom">Create a room</button>
+          <input id="joincode" placeholder="Room code" maxlength="5" style="width:130px;text-transform:uppercase">
+          <button class="btn ghost" id="joinroom">Join</button></div><div id="playmsg"></div>`
+        : `<p class="muted small">This game doesn't have a live runtime yet.</p>`}
       </div>`);
+    const mk = document.getElementById("mkroom");
+    if (mk) {
+      const pm = document.getElementById("playmsg");
+      mk.onclick = async () => { mk.disabled = true; try { await window.GHPlay.createRoom(g); } catch (e) { pm.innerHTML = `<p class="err">${esc(e.message)}</p>`; mk.disabled = false; } };
+      const join = () => { const c = document.getElementById("joincode").value.trim().toUpperCase(); if (/^[A-Z0-9]{5}$/.test(c)) go("#/play/" + c); else pm.innerHTML = `<p class="err">Room codes are 5 letters or digits.</p>`; };
+      document.getElementById("joinroom").onclick = join;
+      document.getElementById("joincode").onkeydown = e => { if (e.key === "Enter") join(); };
+    }
   }
 
   /* ---------------------------------------------------------------- router */
   function route() {
     if (!configured) return notConfigured();
+    window.GHPlay?.teardown();
     const h = location.hash || "#/";
     const [, path, arg] = h.match(/^#\/([^/]*)\/?(.*)$/) || [, "", ""];
     if (path === "") return viewMarketplace();
@@ -180,10 +193,13 @@
     if (path === "new") return viewNew();
     if (path === "edit") return viewEdit(arg);
     if (path === "game") return viewGame(arg);
+    if (path === "play") return window.GHPlay.view(arg);
     setHTML(`<p class="muted">Page not found. <a href="#/">Home</a></p>`);
   }
 
   /* ---------------------------------------------------------------- boot */
+  window.GH = { db, esc, go };
+
   async function boot() {
     if (!configured) { renderNav(); route(); return; }
     const { data } = await db.auth.getSession();
