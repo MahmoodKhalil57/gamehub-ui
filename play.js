@@ -15,7 +15,7 @@
   };
 
   const P = { code: null, room: null, st: {}, players: {}, msgs: new Map(), priv: null, online: new Set(), me: null,
-    chan: null, ticker: null, lastTick: 0, ticking: false, busy: false, err: "", accuseOpen: false, myVote: null };
+    chan: null, ticker: null, lastTick: 0, ticking: false, busy: false, err: "", accuseOpen: false, myVote: null, judgedKey: null };
   let db, esc, root;
 
   const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -69,7 +69,7 @@
   /* ------------------------------------------------------------ the room clock */
   function due() {
     const st = P.st, now = Date.now();
-    if (!st.endsAt || !["argue", "chat", "negotiate", "vote"].includes(st.phase)) return false;
+    if (!st.endsAt || !["argue", "chat", "negotiate", "vote", "judging"].includes(st.phase)) return false;
     if (now >= st.endsAt) return true;
     const half = st.phaseAt + (st.endsAt - st.phaseAt) / 2;
     if (st.phase === "chat" && !st.tf?.hint && now >= half) return true;
@@ -161,7 +161,7 @@
     if (P.ticker) clearInterval(P.ticker);
     if (P.chan) db.removeChannel(P.chan);
     Object.assign(P, { code: null, room: null, st: {}, players: {}, msgs: new Map(), priv: null, online: new Set(), chan: null, ticker: null,
-      lastTick: 0, ticking: false, busy: false, err: "", accuseOpen: false, myVote: null });
+      lastTick: 0, ticking: false, busy: false, err: "", accuseOpen: false, myVote: null, judgedKey: null });
   }
 
   async function createRoom(game) {
@@ -190,6 +190,7 @@
     const b = e.target.closest("[data-a]"); if (!b || !P.code) return;
     const a = b.dataset.a, v = b.dataset.v;
     if (a === "dur") return act(() => call("room_set_duration", { p_ms: +v }));
+    if (a === "judge") return act(() => call("room_set_judge", { p_mode: v }));
     if (a === "start" || a === "again") return act(() => call("room_start"));
     if (a === "next") return act(() => call("room_next_round"));
     if (a === "lobby") return act(() => call("room_to_lobby"));
@@ -237,9 +238,18 @@
     };
   }
 
+  function summonJudge() {
+    const key = P.st.judgeKey;
+    if (P.st.phase !== "judging" || !key || P.judgedKey === key) return;
+    P.judgedKey = key;
+    const code = P.code;
+    setTimeout(() => { if (P.code === code) db.functions.invoke("judge", { body: { code } }).catch(e => console.warn(e)); }, Math.random() * 1500);
+  }
+
   function render() {
     if (!P.code || !$("pv-main") || !P.room) return;
     const st = P.st;
+    summonJudge();
     $("pv-game").textContent = ENGINES[engine()]?.name || "Room";
     $("pv-people").innerHTML = Object.values(P.players).filter(p => !P.online.size || P.online.has(p.uid)).map(p =>
       `<span class="person"><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.name)}${p.uid === P.room.host ? " ★" : ""}${p.uid === P.me ? " (you)" : ""}</span>`).join("");
@@ -282,8 +292,12 @@
     if (isHost()) {
       const dur = st.duration || e.durations[1][0];
       h += `<span class="label">Round length</span><div class="row">${e.durations.map(([ms, l]) => `<button class="btn sm ${dur === ms ? "" : "ghost"}" data-a="dur" data-v="${ms}">${l}</button>`).join("")}</div>
+        ${engine() !== "friends" ? `<span class="label" style="margin-top:12px">Judge</span><div class="row">
+          <button class="btn sm ${st.judgeMode === "ai" ? "ghost" : ""}" data-a="judge" data-v="crowd">Crowd vote</button>
+          <button class="btn sm ${st.judgeMode === "ai" ? "" : "ghost"}" data-a="judge" data-v="ai">AI judge</button></div>
+          <p class="small muted">${st.judgeMode === "ai" ? "An AI judge scores both sides when the round ends. If it can't decide, the room votes instead." : "When the round ends, everyone votes for the winner."}</p>` : ""}
         <div class="row" style="margin-top:12px"><button data-a="start" ${P.busy ? "disabled" : ""}>Start game</button></div>`;
-    } else h += `<p class="muted">Waiting for the host to start…</p>`;
+    } else h += `${engine() !== "friends" ? `<p class="small muted">Judge: ${st.judgeMode === "ai" ? "AI" : "crowd vote"}</p>` : ""}<p class="muted">Waiting for the host to start…</p>`;
     return h + `</div>` + boardView();
   }
 
@@ -292,6 +306,11 @@
       const members = Object.entries(P.st.teams || {}).filter(([, x]) => x === t).map(([u]) => nameOf(u));
       return `<div class="team t${t}"><strong>${esc(teamName(t))}${myTeam() === t ? " · you" : ""}</strong><span class="small">${members.map(esc).join(", ") || "—"}</span>${inner ? inner(t) : ""}</div>`;
     }).join("")}</div>`;
+  }
+
+  function judgingCard() {
+    if (P.st.phase !== "judging") return "";
+    return `<div class="card"><h2>The judge is deliberating…</h2><p class="muted">Reading every argument. If the judge can't decide within 45 seconds, the room votes instead.</p></div>`;
   }
 
   function votePanel(question, options) {
@@ -306,9 +325,13 @@
   function resultView(title) {
     const r = P.st.result; if (!r) return "";
     const tot = Math.max(1, (r.counts?.A || 0) + (r.counts?.B || 0));
-    const bar = t => `<div class="bar"><span>${esc(teamName(t))}</span><span class="track"><span class="fill t${t}" style="width:${(r.counts?.[t] || 0) / tot * 100}%"></span></span><span class="mono">${r.counts?.[t] || 0}</span></div>`;
-    let h = `<div class="card"><span class="label">The verdict</span><h2>${esc(title)}</h2>`;
-    if (r.counts) h += bar("A") + bar("B");
+    const bar = (t, v, max, suffix = "") => `<div class="bar"><span>${esc(teamName(t))}</span><span class="track"><span class="fill t${t}" style="width:${Math.max(0, Math.min(100, v / max * 100))}%"></span></span><span class="mono">${v}${suffix}</span></div>`;
+    let h = `<div class="card"><span class="label">${r.ai ? "The judge's verdict" : "The room's verdict"}</span><h2>${esc(title)}</h2>`;
+    if (r.counts) h += bar("A", r.counts.A || 0, tot) + bar("B", r.counts.B || 0, tot);
+    const sc = r.scores || {};
+    if (sc.convincing) h += `<span class="label">Convincing</span>` + bar("A", sc.convincing.A, 10) + bar("B", sc.convincing.B, 10);
+    if (sc.craft) h += `<span class="label">Did the most with it</span>` + bar("A", sc.craft.A, 10) + bar("B", sc.craft.B, 10);
+    if (sc.closeness) h += `<span class="label">How close to their ideal</span>` + bar("A", sc.closeness.A, 100, "%") + bar("B", sc.closeness.B, 100, "%");
     if (r.outcome) h += `<p class="small muted">${esc(r.outcome)}</p>`;
     h += `<p>${esc(r.verdict)}</p>`;
     if (r.briefs) h += `<span class="label">Secret briefs revealed</span>` + ["A", "B"].map(t => `<div class="brief"><strong>${esc(r.briefs[t].name)}</strong><p class="small">Wanted: ${esc(r.briefs[t].ideal)}</p><p class="small">Walk-away: ${esc(r.briefs[t].walkaway)} · Leverage: ${esc(r.briefs[t].leverage)}</p></div>`).join("");
@@ -324,7 +347,7 @@
     let h = `<div class="card case"><div class="row between"><span class="label">Round ${P.st.round || 1} · ${esc(L.place || "")}</span>
       ${t ? `<span class="pill ${L.sides?.[t] === "for" ? "live" : "draft"}">You: ${esc(teamName(t))}</span>` : `<span class="pill">Watching</span>`}</div>
       <p class="law">“${esc(L.law)}”</p>${L.twist ? `<p class="twist">${esc(L.twist)}</p>` : ""}${teamsView()}</div>`;
-    h += votePanel("Which side argued best?", [["A", teamName("A")], ["B", teamName("B")]]);
+    h += judgingCard() + votePanel("Which side argued best?", [["A", teamName("A")], ["B", teamName("B")]]);
     if (P.st.phase === "result") { const w = P.st.result?.winner; h += resultView(w === "tie" ? "It's a tie" : `"${teamName(w)}" wins`); }
     return h;
   }
@@ -355,7 +378,7 @@
     const b = my?.brief;
     if (b && st.phase !== "result") h += `<div class="brief secret"><span class="label">Secret brief · ${esc(b.name)}</span><p>${esc(b.brief)}</p><p class="small"><strong>Ideal:</strong> ${esc(b.ideal)}</p><p class="small"><strong>Walk away at:</strong> ${esc(b.walkaway)}</p><p class="small"><strong>Your leverage:</strong> ${esc(b.leverage)}</p></div>`;
     h += `</div>`;
-    h += votePanel("Who got the better deal?", [["A", teamName("A")], ["B", teamName("B")]]);
+    h += judgingCard() + votePanel("Who got the better deal?", [["A", teamName("A")], ["B", teamName("B")]]);
     if (st.phase === "result") { const w = st.result?.winner; h += resultView(w === "tie" ? "It's a tie" : `${teamName(w)} wins`); }
     return h;
   }
