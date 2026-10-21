@@ -62,7 +62,7 @@
       const password = document.getElementById("pw").value;
       if (!email || !password) { msg.innerHTML = `<p class="err">Email and password required.</p>`; return; }
       msg.innerHTML = `<p class="muted">Working…</p>`;
-      const fn = login ? db.auth.signInWithPassword({ email, password }) : db.auth.signUp({ email, password });
+      const fn = login ? db.auth.signInWithPassword({ email, password }) : db.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
       const { data, error } = await fn;
       if (error) { msg.innerHTML = `<p class="err">${esc(error.message)}</p>`; return; }
       if (!login && !data.session) { msg.innerHTML = `<p class="ok">Account created. Check your email to confirm, then log in.</p>`; return; }
