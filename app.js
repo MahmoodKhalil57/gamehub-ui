@@ -155,10 +155,9 @@
     setHTML(`<p class="muted">Loading…</p>`);
     const { data: g, error } = await db.from("games").select("*").eq("slug", slug).single();
     if (error || !g) { setHTML(`<div class="card"><p class="err">Game not found or not published.</p><a href="#/">Back to marketplace</a></div>`); return; }
-    db.rpc("increment_play", { game_slug: slug });
     setHTML(`<a class="small muted" href="#/">← Marketplace</a>
       <div class="card" style="margin-top:12px">
-        <div class="row between"><h1>${esc(g.title)}</h1><span class="pill live">${g.plays + 1} plays</span></div>
+        <div class="row between"><h1>${esc(g.title)}</h1><span class="pill live">${g.plays} plays</span></div>
         <p class="muted">${esc(g.tagline)}</p>
         <p style="white-space:pre-wrap;margin-top:10px">${esc(g.description) || "<span class='muted'>No description.</span>"}</p>
       </div>
